@@ -1,0 +1,72 @@
+import torch
+from typing import Any, Tuple
+
+
+class BasicBaseline(object):
+
+    def eval(self, x: dict | torch.Tensor, c: torch.Tensor) -> \
+            Tuple[torch.Tensor | float, torch.Tensor | float]:
+        """
+        Evaluate the baseline.
+
+        Args:
+            x (dict or torch.Tensor): Input batch.
+            c (torch.Tensor): Cost (negative reward) found by the model.
+
+        Returns:
+            tuple: Tuple containing the baseline value and the loss.
+        """
+        raise NotImplementedError("Override this method")
+
+    def get_learnable_parameters(self) -> list:
+        """
+        Get learnable parameters of the baseline.
+
+        Returns:
+            list: List of learnable parameters.
+        """
+        return []
+
+    def epoch_callback(self, model: torch.nn.Module, epoch: int) -> None:
+        """
+        Epoch callback.
+
+        Args:
+            model (torch.Tensor): Model.
+            epoch (int): Epoch number.
+        """
+        pass
+
+    def state_dict(self) -> dict:
+        """
+        Get the state dictionary.
+
+        Returns:
+            dict: State dictionary.
+        """
+        return {}
+
+    def load_state_dict(self, state_dict: dict) -> None:
+        """
+        Load the state dictionary of the baseline.
+
+        Args:
+            state_dict: State dictionary to load.
+        """
+        pass
+
+
+class NoBaseline(BasicBaseline):
+
+    def eval(self, x: dict | torch.Tensor, c: torch.Tensor) -> Tuple[torch.Tensor | float, torch.Tensor | float]:
+        """
+        Evaluate the baseline.
+
+        Args:
+            x (dict or torch.Tensor): Input batch.
+            c (torch.Tensor): Cost (negative reward) found by the model.
+
+        Returns:
+            tuple: Tuple containing the baseline value and the loss.
+        """
+        return 0, 0  # No baseline, no loss

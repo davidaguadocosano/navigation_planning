@@ -109,29 +109,32 @@ def clip_grad_norms(param_groups: list, max_norm: float = np.inf):
     grad_norms_clipped = [min(g_norm, max_norm) for g_norm in grad_norms] if max_norm > 0 else grad_norms
     return grad_norms, grad_norms_clipped
 
-
-def contrastive_loss(graph_embedding, image_embedding, *args, **kwargs):
+#dac
+def contrastive_loss(graph_embedding, rotated_embedding, *args, **kwargs):
     # https://github.com/openai/CLIP/blob/main/clip/model.py | https://github.com/openai/CLIP/issues/83
     
     # Average embeddings across nodes/patches to get 2-dimensional embeddings: (batch_size, hidden_dim)
-    graph_embedding = graph_embedding.mean(dim=1)
-    image_embedding = image_embedding.mean(dim=1)
+    graph_emb = graph_embedding.mean(dim=1)
+    rotated_emb = rotated_embedding.mean(dim=1)
     
     # Normalize embeddings
-    graph_embedding = torch.nn.functional.normalize(graph_embedding, dim=1)
-    image_embedding = torch.nn.functional.normalize(image_embedding, dim=1)
+    graph_emb = torch.nn.functional.normalize(graph_emb, dim=1)
+    rotated_emb = torch.nn.functional.normalize(rotated_emb, dim=1)
     
     # Cosine similarity as logits
-    logits_per_graph = graph_embedding @ image_embedding.t()
-    logits_per_image = logits_per_graph.t()
+    logits = graph_emb @ rotated_emb.t()
+    #logits_per_graph = graph_embedding @ image_embedding.t()
+    #logits_per_image = logits_per_graph.t()
     
     # Define ground truth for CrossEntropyLoss
-    ground_truth = torch.arange(logits_per_graph.shape[0]).to(device=logits_per_graph.device)
+    labels = torch.arange(logits.shape[0]).to(logits.device)
+    #ground_truth = torch.arange(logits_per_graph.shape[0]).to(device=logits_per_graph.device)
     
     # Calculate CrossEntropyLoss
-    loss_graph = torch.nn.CrossEntropyLoss()(logits_per_graph, ground_truth)
-    loss_image = torch.nn.CrossEntropyLoss()(logits_per_image, ground_truth)
-    return (loss_graph + loss_image) / 2
+    loss = torch.nn.CrossEntropyLoss()(logits, labels)
+    #loss_graph = torch.nn.CrossEntropyLoss()(logits_per_graph, ground_truth)
+    #loss_image = torch.nn.CrossEntropyLoss()(logits_per_image, ground_truth)
+    return loss #(loss_graph + loss_image) / 2
 
 
 def reinforce_loss(reward, log_prob, reward_bl=0, loss_bl=0, val=False, *args, **kwargs):

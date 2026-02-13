@@ -23,6 +23,7 @@ class RolloutBaseline(BasicBaseline):
         """
         super(BasicBaseline, self).__init__()
         self.opts = opts
+        self.device = opts.device #dac
         self.loss_func = loss_func
         self._update_model(model, epoch)
 

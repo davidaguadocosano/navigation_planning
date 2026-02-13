@@ -47,3 +47,65 @@ def plot_tsp(actions: np.ndarray, batch: dict, reward: int = 0) -> None:
     # Show plot
     plt.show()
 
+#dac
+import os
+
+def save_rotation_check(nodes, rotated_nodes, save_dir):
+    """
+    Guarda una imagen comparativa del grafo original y el rotado.
+    """
+    # Usar el backend 'Agg' para que no intente abrir una ventana (necesario para SSH)
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+    
+    # Configuración de los ejes
+    for ax in [ax1, ax2]:
+        ax.set_xlim([-0.1, 1.1])
+        ax.set_ylim([-0.1, 1.1])
+        ax.set_aspect('equal')
+        # Dibujar el centro de rotación (0.5, 0.5) para referencia
+        ax.plot(0.5, 0.5, 'rx') 
+
+    # Graficar Original
+    ax1.scatter(nodes[:, 0], nodes[:, 1], c='blue', label='Original')
+    ax1.set_title("Grafo Original")
+    
+    # Graficar Rotado
+    ax2.scatter(rotated_nodes[:, 0], rotated_nodes[:, 1], c='green', label='Rotado')
+    ax2.set_title("Grafo Rotado")
+
+    # Guardar
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    
+    output_path = os.path.join(save_dir, 'rotation_test.png')
+    plt.savefig(output_path)
+    plt.close()
+    print(f"\n[*] Visualización de rotación guardada en: {output_path}")
+
+#dac para visualizar los resultados en un png (al estar en ssh no se como ir visualizando la panatalla))
+def save_training_results(history, label, save_dir, filename):
+    """
+    Genera y guarda una gráfica de la evolución del entrenamiento/validación.
+    """
+    import matplotlib
+    matplotlib.use('Agg') # Asegura compatibilidad con SSH
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(len(history)), history, marker='o', linestyle='-', color='b')
+    plt.title(f'Evolución de {label} por Época')
+    plt.xlabel('Época')
+    plt.ylabel(label)
+    plt.grid(True)
+
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    path = os.path.join(save_dir, f'{filename}.png')
+    plt.savefig(path)
+    plt.close()
+    print(f"[*] Gráfica de rendimiento guardada en: {path}")

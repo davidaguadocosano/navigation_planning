@@ -138,9 +138,9 @@ def load_checkpoint_data(filename: str) -> Any:
     """
     return torch.load(filename, map_location=lambda storage, loc: storage)
 
-
+"""
 def get_checkpoint(path: str, epoch: int | None = None) -> Tuple[str, str, int]:
-    """
+    #esto se comentaba con 3 comas
     Determines whether the provided path is a file or directory and returns the appropriate model filename. If it is a
     directory, it returns the latest saved model filename when there are more than one in the directory.
 
@@ -150,7 +150,7 @@ def get_checkpoint(path: str, epoch: int | None = None) -> Tuple[str, str, int]:
 
     Returns:
         tuple: A tuple containing the model filename, its directory, and the next epoch.
-    """
+    #esto se comentaba con 3 comas
 
     # Path indicates the saved checkpoint
     if os.path.isfile(path):
@@ -174,6 +174,40 @@ def get_checkpoint(path: str, epoch: int | None = None) -> Tuple[str, str, int]:
     checkpoint_dirname = os.path.dirname(checkpoint_filename)
     
     # Return checkpoint filename, checkpoint dirname, and next epoch
+    return checkpoint_filename, checkpoint_dirname, epoch + 1
+"""
+def get_checkpoint(path: str, epoch: int | None = None) -> Tuple[str, str, int]:
+    """
+    Determina si la ruta es un archivo o directorio y extrae el nombre del modelo y la siguiente época.
+    """
+    # CASO 1: La ruta es un archivo directo
+    if os.path.isfile(path):
+        checkpoint_filename = path
+        # Intentamos extraer el número de época del nombre del archivo (ej: epoch-000.pt)
+        if epoch is None:
+            try:
+                # Extrae '000' de 'epoch-000.pt' y lo convierte a entero
+                epoch = int(os.path.basename(path).split("-")[1].split(".")[0])
+            except (IndexError, ValueError):
+                epoch = 0 # Valor por defecto si el nombre no sigue el formato
+
+    # CASO 2: La ruta es un directorio
+    elif os.path.isdir(path):
+        if epoch is None:
+            # Busca el archivo con el número de época más alto
+            files = [f for f in os.listdir(path) if f.endswith('.pt') and '-' in f]
+            if not files:
+                return "", "", 0
+            epoch = max(int(os.path.splitext(f)[0].split("-")[1]) for f in files)
+        
+        checkpoint_filename = os.path.join(path, f"epoch-{str(epoch).zfill(3)}.pt")
+    
+    else:
+        return "", "", 0
+    
+    checkpoint_dirname = os.path.dirname(checkpoint_filename)
+    
+    # Ahora epoch ya no es None, por lo que la suma funcionará
     return checkpoint_filename, checkpoint_dirname, epoch + 1
 
 

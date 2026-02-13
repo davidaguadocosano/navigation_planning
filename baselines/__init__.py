@@ -62,4 +62,16 @@ def get_baseline(opts: argparse.Namespace, model: torch.nn.Module, loss_func: An
         if 'baseline' in checkpoint:
             baseline.load_state_dict(checkpoint['baseline'])
             baseline.epoch_callback(model, epoch)
+
+    #dac
+    # Load baseline state dict
+    if checkpoint is not None and 'baseline' in checkpoint:
+        try:
+            baseline.load_state_dict(checkpoint['baseline'])
+            print(f"[*] Baseline state loaded from {opts.load_path}")
+        except (KeyError, TypeError):
+            print("[!] Checkpoint doesn't contain a valid baseline for this scenario. Starting with a fresh baseline.")
+    else:
+        print("[*] No baseline found in checkpoint. Initializing fresh baseline.")
+        
     return baseline

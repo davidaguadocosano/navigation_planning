@@ -98,9 +98,13 @@ def get_model(model, env, scenario, device, freeze_encoder=False, checkpoint=Non
     # Create model (encoder + decoder)
     return Model(encoder=encoder, decoder=decoder, state=state).to(device)
 
-
+#dac
 def select_modules(model, scenario):
     module1, module2 = model.split('_')
+    if scenario == 'contrastive':
+        graph_encoder = module1
+        image_encoder = None
+        decoder = None
     if scenario == 'graph':
         graph_encoder = module1
         image_encoder = None
@@ -127,7 +131,8 @@ class Model(torch.nn.Module):
     def set_train(self, train=False, return_actions=False, *args, **kwargs):
         if self.decoder is not None:
             self.decoder.set_train(train=train, return_actions=return_actions)
-        
+   
+   #dac
     def forward(self, data):
         
         # Define state (if not contrastive learning)
@@ -135,6 +140,11 @@ class Model(torch.nn.Module):
         
         # Calculate embeddings from encoder
         embeddings = self.encoder(data)
+
+        # Si el encoder devolvió una tupla (original y rotado) pero tenemos un decoder,
+        # solo pasamos el embedding original al decoder.
+        if self.decoder is not None and isinstance(embeddings, tuple):
+            embeddings = embeddings[0]
         
         # Make predictions from encoder (if not contrastive learning)
         predictions = None if (self.decoder is None) else self.decoder(embeddings, state)
@@ -176,9 +186,20 @@ class Encoder(torch.nn.Module):
         
         else:
             self.image_encoder = None
-        
+
+    #dac modificar encoder para que procese 2 grafos    
     def forward(self, data):
-        
+
+        if 'nodes_rotated' in data:
+            # Pasamos el original y el rotado por el MISMO encoder de grafos (comparten pesos)
+            emb1 = self.graph_encoder({'nodes': data['nodes']})
+            emb2 = self.graph_encoder({'nodes': data['nodes_rotated']})
+            return emb1, emb2
+    
+        # Mantener lógica original para otros casos
+        graph_embedding = self.graph_encoder(data) if (self.graph_encoder is not None) else None
+        return graph_embedding
+    """    
         # Graph embeddings
         graph_embedding = self.graph_encoder(data) if (self.graph_encoder is not None) else None
         
@@ -191,6 +212,7 @@ class Encoder(torch.nn.Module):
         if image_embedding is None:
             return graph_embedding
         return graph_embedding, image_embedding
+    """
 
 
 class Decoder(torch.nn.Module):

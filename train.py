@@ -34,7 +34,7 @@ def get_options(args: list = None) -> argparse.Namespace:
     parser.add_argument('--graph_encoder', type=str, default='gtn', help=f"Graph encoders: {', '.join(GRAPH_ENCODERS)}. You may indicate a path to load instead")
     
     # Image encoder
-    parser.add_argument('--image_encoder', type=str, default='vit', help=f"Image encoders: {', '.join(IMAGE_ENCODERS)}. You may indicate a path to load instead")
+    parser.add_argument('--image_encoder', type=str, default=None, help=f"Image encoders: {', '.join(IMAGE_ENCODERS)}. You may indicate a path to load instead") #dac
     parser.add_argument('--image_size', type=int, default=64, help=f"Binary map shape (assume squared image)")
     parser.add_argument('--patch_size', type=int, default=16, help=f"Patch size for ViT encoder")
     
@@ -62,7 +62,7 @@ def get_options(args: list = None) -> argparse.Namespace:
     
     # Nodes & obstacles
     parser.add_argument('--num_nodes', type=int, default=20, help="Number of visitable nodes")
-    parser.add_argument('--num_obs', type=int, default=10, help="Number of avoidable obstacles (0 to not use obstacles)")
+    parser.add_argument('--num_obs', type=int, default=0, help="Number of avoidable obstacles (0 to not use obstacles)")
     
     ##################################################### TRAINING #####################################################
     
@@ -163,6 +163,20 @@ def main(rank=0, opts=None, world_size=1):
     # Load model
     model, checkpoint, first_epoch = load_model(opts=opts, train=True)
     first_epoch = first_epoch if opts.resume else opts.first_epoch
+
+    #dac
+    # Si detectamos que el checkpoint no tiene los datos que una baseline de RL necesita,
+    # forzamos a que la baseline se inicialice desde cero (fresca).
+    if checkpoint is not None and 'baseline' in checkpoint:
+        # Si la baseline guardada no tiene la estructura de 'model', es de un tipo incompatible
+        if 'model' not in checkpoint['baseline'] and opts.baseline == 'rollout':
+            print("[*] Incompatible baseline found in checkpoint. Initializing fresh baseline for TSP.")
+            checkpoint_for_baseline = None
+        else:
+            checkpoint_for_baseline = checkpoint
+    else:
+        checkpoint_for_baseline = checkpoint
+    # ------------------------------------------------------------------------------------------
     
     # Loss function
     loss_func = contrastive_loss if use_contrastive else reinforce_loss
@@ -172,7 +186,7 @@ def main(rank=0, opts=None, world_size=1):
         opts=opts,
         model=model,
         loss_func=loss_func,
-        checkpoint=checkpoint,
+        checkpoint=checkpoint_for_baseline, #checkpoint,
         epoch=first_epoch
     )
     
@@ -202,6 +216,9 @@ def main(rank=0, opts=None, world_size=1):
         use_distributed=opts.use_distributed,
         num_workers=opts.num_workers
     )
+
+    #dac
+    val_history = []  # Lista para guardar el rendimiento de cada época
     
     # Train loop
     for epoch in range(first_epoch, opts.first_epoch + opts.num_epochs):
@@ -237,6 +254,16 @@ def main(rank=0, opts=None, world_size=1):
         print(f"\nStart train epoch {epoch}, lr={optimizer.param_groups[0]['lr']}")
         for batch_id, batch in enumerate(tqdm(train_dataloader, desc='Training')):
             
+            #dac----------------------------------------------------------------------------
+            if epoch == first_epoch and batch_id == 0:
+                from utils.plot_utils import save_rotation_check
+                # Extraemos el primer ejemplo del batch y lo pasamos a numpy
+                # Recordamos que 'nodes' y 'nodes_rotated' vienen del generador modificado
+                n_orig = batch['nodes'][0].detach().cpu().numpy()
+                n_rot = batch['nodes_rotated'][0].detach().cpu().numpy()
+                save_rotation_check(n_orig, n_rot, opts.save_dir)
+            #-------------------------------------------------------------------------------
+
             # Move batch to device
             batch = move_to(var=batch,device=opts.device)
             
@@ -297,6 +324,9 @@ def main(rank=0, opts=None, world_size=1):
             device=opts.device
         ).mean().item()
 
+        #dac
+        val_history.append(loss_val) # Guardar el valor en el historial
+
         # Tensorboard info
         if not opts.debug:
             tb_logger.log_value(
@@ -314,6 +344,12 @@ def main(rank=0, opts=None, world_size=1):
     # End training
     if opts.use_distributed:
         cleanup()
+    
+    #dac
+    from utils.plot_utils import save_training_results
+    label_name = 'Loss (Contrastive)' if use_contrastive else 'Average Reward (TSP)'
+    save_training_results(val_history, label_name, opts.save_dir, 'training_performance')
+    
     print('Finished')
 
 

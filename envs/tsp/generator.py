@@ -32,7 +32,7 @@ class TSPGenerator(Dataset):
         # Obstacles
         obstacles = None #generate_obstacles(max_obs=self.num_obs)
         
-        # Define nodes
+        # Define nodes  dac num_depots era 0
         nodes, _, _, _ = generate_nodes(
             num_nodes=self.num_nodes, num_depots=0, obs=None, image_size=self.image_size
         )

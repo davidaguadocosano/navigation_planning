@@ -109,3 +109,40 @@ def save_training_results(history, label, save_dir, filename):
     plt.savefig(path)
     plt.close()
     print(f"[*] Gráfica de rendimiento guardada en: {path}")
+
+#dac
+def plot_tsp_solution(nodes, tour, save_path):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import torch
+
+    # Convertir nodos a numpy si son tensores
+    if torch.is_tensor(nodes):
+        nodes = nodes.cpu().numpy()
+    
+    # Convertir tour a numpy entero de forma segura
+    if torch.is_tensor(tour):
+        tour = tour.cpu().numpy()
+    tour = np.atleast_1d(tour).astype(int).flatten()
+
+    plt.figure(figsize=(8, 8))
+    plt.scatter(nodes[:, 0], nodes[:, 1], c='red', zorder=2)
+    
+    # Crear ruta cerrada
+    if len(tour) > 1:
+        full_tour = np.append(tour, tour[0])
+        tour_nodes = nodes[full_tour]
+        plt.plot(tour_nodes[:, 0], tour_nodes[:, 1], c='blue', linewidth=2, zorder=1)
+    
+    # Dibujar el inicio (cuadrado verde) - Solo en el primer nodo del tour
+    start_node = tour[0]
+    plt.scatter(nodes[start_node, 0], nodes[start_node, 1], c='green', s=100, marker='s', label='Inicio', zorder=3)
+
+    plt.title(f"Ruta TSP (Nodos: {len(tour)})")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(save_path)
+    plt.close()
+    print(f"[*] Imagen generada en: {save_path}")

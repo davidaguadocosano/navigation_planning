@@ -111,7 +111,7 @@ def save_training_results(history, label, save_dir, filename):
     print(f"[*] Gráfica de rendimiento guardada en: {path}")
 
 #dac
-def plot_tsp_solution(nodes, tour, save_path):
+def plot_tsp_solution(nodes, tour, save_path, title=None):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -128,19 +128,26 @@ def plot_tsp_solution(nodes, tour, save_path):
     tour = np.atleast_1d(tour).astype(int).flatten()
 
     plt.figure(figsize=(8, 8))
+    # Dibujamos todos los nodos en rojo
     plt.scatter(nodes[:, 0], nodes[:, 1], c='red', zorder=2)
     
-    # Crear ruta cerrada
+    # Crear ruta cerrada si hay más de un nodo
     if len(tour) > 1:
+        # Para el TSP cerramos el ciclo volviendo al primero
         full_tour = np.append(tour, tour[0])
         tour_nodes = nodes[full_tour]
         plt.plot(tour_nodes[:, 0], tour_nodes[:, 1], c='blue', linewidth=2, zorder=1)
     
-    # Dibujar el inicio (cuadrado verde) - Solo en el primer nodo del tour
-    start_node = tour[0]
-    plt.scatter(nodes[start_node, 0], nodes[start_node, 1], c='green', s=100, marker='s', label='Inicio', zorder=3)
+    # Dibujar el inicio (cuadrado verde)
+    if len(tour) > 0:
+        start_node = tour[0]
+        plt.scatter(nodes[start_node, 0], nodes[start_node, 1], c='green', s=100, marker='s', label='Inicio', zorder=3)
 
-    plt.title(f"Ruta TSP (Nodos: {len(tour)})")
+    # USAR TÍTULO PERSONALIZADO O DEFECTO
+    if title is None:
+        title = f"Ruta TSP (Nodos: {len(np.unique(tour))})"
+    
+    plt.title(title)
     plt.legend()
     plt.grid(True)
     plt.savefig(save_path)

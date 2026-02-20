@@ -179,7 +179,7 @@ class TSPState(NamedTuple):
                 ),
             )
         )
-        reward[condition] = reward[condition] + 20
+        reward[condition] = reward[condition] + 60   #dac ponia 20
         
         # Penalty: do not finish on time (max_iters avoids endless episodes)
         condition = torch.logical_and(nf, self.i + 1 >= self.max_iters)

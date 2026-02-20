@@ -9,12 +9,8 @@ from utils.plot_utils import plot_tsp_solution
 from utils.train_utils import move_to
 
 def process_tour(actions):
-    """Extrae y limpia la ruta de nodos de las acciones del decoder"""
-    # En ar_decoder.py, actions tiene forma [Batch, Pasos, 2]
-    # La primera columna [:, 0] son los índices de los nodos
+    """Extrae la secuencia de nodos visitados del tensor de acciones"""
     raw_tour = actions[0, :, 0].cpu().numpy().astype(int)
-    
-    # Filtro para navegación: eliminamos repeticiones consecutivas
     tour = []
     if len(raw_tour) > 0:
         tour.append(raw_tour[0])
@@ -23,70 +19,75 @@ def process_tour(actions):
                 tour.append(raw_tour[i])
     return np.array(tour)
 
+def calculate_dist(nodes, tour):
+    """Calcula la distancia euclidiana total cerrando el tour"""
+    if len(tour) < 2: return 0.0
+    coords = nodes[tour]
+    coords_closed = np.vstack([coords, coords[0]])
+    return np.sum(np.sqrt(np.sum(np.diff(coords_closed, axis=0)**2, axis=1)))
+
 def visualize_comparison():
-    # 1. TRUCO: Extraemos --load_path_2 antes de llamar a get_options
-    # para evitar el error de 'unrecognized arguments'
+    # 1. Extraer paths de modelos
     load_path_2 = None
     if "--load_path_2" in sys.argv:
         idx = sys.argv.index("--load_path_2")
         load_path_2 = sys.argv[idx + 1]
-        # Eliminamos estos dos elementos de sys.argv para que get_options no los vea
-        sys.argv.pop(idx) # Elimina --load_path_2
-        sys.argv.pop(idx) # Elimina el valor del path
+        sys.argv.pop(idx); sys.argv.pop(idx)
     
     if not load_path_2:
-        print("[!] Error: Debes proporcionar --load_path_2 para comparar.")
+        print("[!] Error: Indica --load_path_2")
         return
 
-    # 2. Configurar opciones base
+    # 2. Configuración y Aleatoriedad
     opts = get_options()
-    # FORZAR ALEATORIEDAD:
-    # Si no pasas una semilla por el terminal, usamos el tiempo actual
-    # Esto asegura que el mapa sea distinto en cada ejecución
-    new_seed = int(time.time())
-    torch.manual_seed(new_seed)
-    np.random.seed(new_seed)
-    print(f"[*] Generando mapa con nueva semilla: {new_seed}")
-    
+    seed = int(time.time())
+    torch.manual_seed(seed); np.random.seed(seed)
+    print(f"[*] Evaluando mapa con semilla: {seed}")
+
     opts.device = torch.device("cuda" if opts.use_cuda and torch.cuda.is_available() else "cpu")
 
-    # 3. Cargar ambos modelos
-    print(f"[*] Cargando Modelo 1: {opts.load_path}")
+    # 3. Cargar modelos
     model1, _, _ = load_model(opts=opts, train=False)
-    
-    print(f"[*] Cargando Modelo 2: {load_path_2}")
     original_path = opts.load_path
     opts.load_path = load_path_2
     model2, _, _ = load_model(opts=opts, train=False)
-    opts.load_path = original_path # Restauramos por si acaso
+    opts.load_path = original_path
+    model1.to(opts.device).eval(); model2.to(opts.device).eval()
 
-    model1.to(opts.device).eval()
-    model2.to(opts.device).eval()
-
-    # 4. Generar UN SOLO problema idéntico (fijamos semilla)
-    #torch.manual_seed(1234)        descomentar si quiero usar siempre el mismo escenario
+    # 4. Generar problema común
     dataloader = get_generator(opts.env, 1, opts.num_nodes, opts.num_obs, opts.image_size, 1)
     batch = next(iter(dataloader))
     batch = move_to(batch, opts.device)
+    nodes_np = batch['nodes'][0].cpu().numpy()
 
-    # 5. Obtener soluciones
+    # 5. Obtener soluciones y recompensas
     with torch.no_grad():
-        out1 = model1(batch)
-        out2 = model2(batch)
+        res1 = model1(batch)
+        res2 = model2(batch)
         
-        # ar_decoder.py devuelve (rewards, log_probs, actions, success)
-        # Las acciones (el tour) están en el índice 2
-        tour1 = process_tour(out1[2])
-        tour2 = process_tour(out2[2])
+        t1 = process_tour(res1[2]) # Acciones en res[2]
+        t2 = process_tour(res2[2])
+        
+        # Score positivo = mejor. Invertimos el signo del acumulado
+        score1 = -res1[0].item() 
+        score2 = -res2[0].item()
 
-    print(f"[*] Modelo 1 - Nodos únicos visitados: {len(np.unique(tour1))}")
-    print(f"[*] Modelo 2 - Nodos únicos visitados: {len(np.unique(tour2))}")
+    # 6. Calcular Distancias
+    d1 = calculate_dist(nodes_np, t1)
+    d2 = calculate_dist(nodes_np, t2)
 
-    # 6. Guardar imágenes comparativas
-    plot_tsp_solution(batch['nodes'][0], tour1, "comparison_baseline.png")
-    plot_tsp_solution(batch['nodes'][0], tour2, "comparison_pretrained.png")
+    # 7. Crear Títulos
+    title_1 = f"Base | Nodos: {len(np.unique(t1))} | Dist: {d1:.3f} | Score: {score1:.1f}"
+    title_2 = f"Pre | Nodos: {len(np.unique(t2))} | Dist: {d2:.3f} | Score: {score2:.1f}"
+
+    # 8. Graficar AMBAS soluciones
+    # Usamos el parámetro 'title' que acabamos de añadir a plot_utils
+    plot_tsp_solution(batch['nodes'][0], t1, "eval_modelo_1.png", title=title_1)
+    plot_tsp_solution(batch['nodes'][0], t2, "eval_modelo_2.png", title=title_2)
     
-    print("[*] Imágenes generadas con éxito.")
+    print(f"\n[*] COMPARATIVA FINALIZADA:")
+    print(f"    - Modelo 1: {title_1}")
+    print(f"    - Modelo 2: {title_2}")
 
 if __name__ == "__main__":
     visualize_comparison()
